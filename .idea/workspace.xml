@@ -5,36 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="63f6bda5-e711-4126-95c8-f11a98cd4857" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/jsLibraryMappings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/event_management/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/event_management/urls.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/events/forms.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/events/urls.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/admin/announcements/announcement_form.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/admin/announcements/announcement_list.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/admin/events/event_confirm_delete.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/admin/events/event_form.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/admin/events/event_list.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/admin/events/event_participants.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/admin/reports/reports.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/announcements/announcement_list.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/auth/login.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/auth/register.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/base.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/dashboard/dashboard.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/events/event_detail.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/events/event_list.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/feedback/feedback_form.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/GatherEd.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/GatherEd.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GatherEd/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GatherEd/asgi.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/GatherEd/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/event_management/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/GatherEd/urls.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/GatherEd/wsgi.py" beforeDir="false" afterPath="$PROJECT_DIR$/event_management/wsgi.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/manage.py" beforeDir="false" afterPath="$PROJECT_DIR$/manage.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,7 +37,7 @@
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/JasCiely/GatherEd.git&quot;,
-    &quot;accountId&quot;: &quot;7829d218-4bed-4acf-a3b4-52553708970e&quot;
+    &quot;accountId&quot;: &quot;f6a0c355-0756-4538-b6c0-ff90b9fb2545&quot;
   }
 }</component>
   <component name="ProjectColorInfo">{
@@ -79,9 +53,10 @@
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.OpenDjangoStructureViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "mart",
     "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "C:/Projects/GatherEd",
     "node.js.detected.package.eslint": "true",
@@ -134,8 +109,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-b598e85cdad2-JavaScript-PY-252.25557.178" />
-        <option value="bundled-python-sdk-ce6832f46686-7b97d883f26b-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.25557.178" />
+        <option value="bundled-python-sdk-b3d66beaba9a-c6efb3732140-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.26199.168" />
       </set>
     </attachedChunks>
   </component>

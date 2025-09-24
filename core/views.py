@@ -6,6 +6,8 @@ from supabase import create_client, Client
 from supabase_auth.errors import AuthApiError
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from supabase_auth.errors import AuthApiError
+
 
 # Initialize both Supabase clients
 supabase_public: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
