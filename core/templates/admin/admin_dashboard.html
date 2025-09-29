@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - GatherEd</title>
+    {% load static %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/admin_css.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard-container">
+
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-calendar-check"></i> GatherEd
+            </div>
+            <nav class="sidebar-nav">
+                <a href="javascript:void(0);" data-url="{% url 'admin_dashboard' %}?is_ajax=true" data-clean-url="{% url 'admin_dashboard' %}" class="nav-item active" onclick="handleNavClick(this)">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a href="javascript:void(0);" data-url="{% url 'manage_events' %}?is_ajax=true" data-clean-url="{% url 'manage_events' %}" class="nav-item" onclick="handleNavClick(this)">
+                    <i class="fas fa-calendar-alt"></i> View/Modify Events
+                </a>
+                <a href="javascript:void(0);" data-url="{% url 'create_event' %}?is_ajax=true" data-clean-url="{% url 'create_event' %}" class="nav-item" onclick="handleNavClick(this)">
+                    <i class="fas fa-plus-circle"></i> Create New Event
+                </a>
+                <a href="javascript:void(0);" data-url="{% url 'track_attendance' %}?is_ajax=true" data-clean-url="{% url 'track_attendance' %}" class="nav-item" onclick="handleNavClick(this)">
+                    <i class="fas fa-user-check"></i> Track Attendance
+                </a>
+                <a href="javascript:void(0);" data-url="{% url 'manage_feedback' %}?is_ajax=true" data-clean-url="{% url 'manage_feedback' %}" class="nav-item" onclick="handleNavClick(this)">
+                    <i class="fas fa-comments"></i> View Feedback
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{% url 'logout' %}" class="nav-item logout">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-nav">
+                <h1 class="page-title" id="page-title">Dashboard Overview</h1>
+
+                <div class="header-actions">
+                    <div class="notification-icon" onclick="toggleNotifications()">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge" id="notification-count">{{ notification_count }}</span>
+                    </div>
+
+                    <div class="user-profile">
+                        <span class="profile-name">Admin Name</span>
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                </div>
+            </header>
+
+            <div id="content-area">
+                {% include 'admin/fragments/dashboard_content.html' %}
+            </div>
+
+        </main>
+    </div>
+
+    <div id="notification-drawer" class="notification-drawer">
+        <h3>Notifications</h3>
+        <div id="notification-list">
+            <p style="color: var(--text-muted);">Notifications will load here from the backend.</p>
+        </div>
+    </div>
+
+    <script>
+        function toggleNotifications() {
+            const drawer = document.getElementById('notification-drawer');
+            drawer.classList.toggle('open');
+            const badge = document.getElementById('notification-count');
+            const count = parseInt(badge.textContent || '0');
+
+            // Toggle visibility of the badge when the drawer opens/closes
+            if (drawer.classList.contains('open') && count > 0) {
+                badge.style.display = 'none';
+            } else if (!drawer.classList.contains('open') && count > 0) {
+                badge.style.display = 'block';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const count = parseInt(document.getElementById('notification-count').textContent || '0');
+            document.getElementById('notification-count').style.display = count > 0 ? 'block' : 'none';
+
+            // Set initial state for history API (now redundant due to data-clean-url but safe)
+            document.querySelector('.sidebar-nav .nav-item.active').setAttribute('data-initial-href', window.location.pathname);
+        });
+
+        function loadContent(url, linkElement) {
+            const contentArea = document.getElementById('content-area');
+            const pageTitleElement = document.getElementById('page-title');
+            const activeClass = 'active';
+
+            // 1. Update Active State in Sidebar
+            document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
+                item.classList.remove(activeClass);
+            });
+            linkElement.classList.add(activeClass);
+
+            // 2. Simple Loading State UX
+            contentArea.innerHTML = '<div class="loader-placeholder"><i class="fas fa-sync-alt fa-spin"></i> Loading content...</div>';
+
+            // 3. Extract and Update Title (Improved logic)
+            // Use the link's clean text content, removing leading/trailing spaces.
+            const titleText = linkElement.textContent.replace(/[\s\r\n]+/g, ' ').trim();
+            pageTitleElement.textContent = titleText;
+
+            // Get the clean URL for history update
+            const cleanUrl = linkElement.getAttribute('data-clean-url');
+
+            // 4. Fetch New Content via AJAX
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    contentArea.innerHTML = html;
+                    // 5. Update browser history to reflect the new state without reloading
+                    history.pushState(null, titleText, cleanUrl);
+                })
+                .catch(e => {
+                    console.error('Error loading content:', e);
+                    contentArea.innerHTML = '<div class="error-message">Failed to load content. Please try again.</div>';
+                });
+        }
+
+        function handleNavClick(element) {
+            const url = element.getAttribute('data-url');
+            loadContent(url, element);
+        }
+
+        // Style injection for loading/error messages (kept as is)
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .loader-placeholder {
+                text-align: center;
+                padding: 50px;
+                font-size: 1.2rem;
+                color: var(--primary-color);
+            }
+            .loader-placeholder i {
+                margin-right: 10px;
+            }
+            .error-message {
+                text-align: center;
+                padding: 50px;
+                font-size: 1.2rem;
+                color: var(--attention-color);
+            }
+            /* Add variables if they don't exist in admin_css.css */
+            :root {
+                --primary-color: #00A9FF;
+                --attention-color: #FFC107;
+                --text-muted: #BDBDBD;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
