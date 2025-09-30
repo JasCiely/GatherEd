@@ -1,5 +1,8 @@
+import os
+import uuid
+
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.conf import settings
 from supabase import create_client, Client
@@ -7,6 +10,7 @@ from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from datetime import date
 from django.core.mail import send_mail  # Kept the import in case it's used elsewhere
 from django.template.loader import render_to_string  # Kept the import in case it's used elsewhere
 from django.utils.html import strip_tags  # Kept the import in case it's used elsewhere
@@ -231,54 +235,86 @@ def admin_dashboard(request):
 @login_required
 def manage_events(request):
     """
-    View to display and manage all events.
-    Renders the frontend fragment with clean context for backend readiness.
+    View to display and manage all events, fetching data from Supabase.
     """
     is_ajax = request.GET.get('is_ajax') == 'true'
 
-    # 🛑 PERMISSION CHECK (Disabled for current diagnostic mode) 🛑
+    # 🛑 PERMISSION CHECK: Keep commented out until ready 🛑
     # if not request.user.is_staff:
     #     if is_ajax:
     #         return HttpResponse("Permission Denied: Admin role required.", status=403)
     #     else:
     #         return redirect('student_dashboard')
 
-    # Context with empty lists, ready for backend integration
+    events_list = []
+
+    try:
+        # Fetch all events, ordered by date
+        fetch_result = supabase_admin.table('events').select('*').order('date', desc=False).execute()
+
+        # Helper function to determine status
+        def get_event_status(event_date):
+            today = date.today()
+            event_date = date.fromisoformat(event_date)
+
+            if event_date > today:
+                return 'Upcoming'
+            elif event_date == today:
+                return 'Active'
+            else:
+                return 'Completed'
+
+        # Process data and add status/registrations (mocked for now)
+        for event in fetch_result.data:
+            # NOTE: Implement real logic to count registrations from event_registrations later
+            mock_registrations = 'N/A'  # Placeholder until registration logic is ready
+
+            events_list.append({
+                'id': event['id'],
+                'name': event['title'],
+                'date': event['date'],
+                'registrations': mock_registrations,
+                'status': get_event_status(event['date']),
+            })
+
+    except Exception as e:
+        # Log the error for debugging purposes
+        print(f"Error fetching events from Supabase: {e}")
+        # Optionally, send an error message to the user
+
     template_context = {
-        'events_list': [],  # List of event dictionaries for the main table
-        #'schools_list': [],  # List of school dictionaries for the filter dropdown
+        'events_list': events_list,
     }
 
-    if request.method == 'POST':
-        # Future logic for handling edit/delete actions goes here
-        return redirect('manage_events')
-    else:
-        template_name = 'admin/fragments/manage_events_content.html'
+    template_name = 'admin/fragments/manage_events_content.html'
 
-        if not is_ajax:
-            return redirect('admin_dashboard')
+    if not is_ajax:
+        # If it's a full page load, redirect to the dashboard that contains this fragment
+        return redirect('admin_dashboard')
 
-        return render(request, template_name, template_context)
+    return render(request, template_name, template_context)
 
 
-# @login_required  # Keep this commented out for development
+@login_required
 def create_event(request):
-    # REMOVED: user_id = str(request.user.pk) <--- Moved this inside the POST block, and commented it out
-
+    """
+    Handles the creation of a new event, submitting data to Supabase via AJAX.
+    """
     is_ajax = request.GET.get('is_ajax') == 'true'
     context = {}
 
-    # --- 1. HANDLE POST REQUEST (Form Submission) ---
+    # --- GET AUTHENTICATED ADMIN ID ---
+    try:
+        # We grab the admin's numerical ID (bigint) from the logged-in user's primary key (pk)
+        current_admin_id = request.user.pk
+    except Exception:
+        messages.error(request, "Authentication error: Admin ID could not be determined.")
+        return redirect('admin_dashboard')
+
+        # --- 1. HANDLE POST REQUEST (Form Submission) ---
     if request.method == 'POST':
-        # Safely retrieve user_id ONLY when handling POST logic that requires authentication
-        # user_id = str(request.user.pk) # <--- Keep this commented out until you re-enable @login_required
-
         try:
-            # Check if the user is an admin (uncomment when required)
-            # if not supabase_public.table('admins').select('id').eq('id', user_id).execute().data:
-            #     messages.error(request, "Access denied.")
-            #     return redirect('admin_dashboard')
-
+            # --- FORM FIELD RETRIEVAL ---
             title = request.POST.get('title')
             description = request.POST.get('description')
             date = request.POST.get('date')
@@ -287,37 +323,47 @@ def create_event(request):
             end_time = request.POST.get('end_time')
             max_attendees = request.POST.get('max_attendees')
 
-            # Ensure start_time is included in the required fields check
+            # --- FIELD VALIDATION ---
             if not all([title, description, date, start_time]):
                 messages.error(request, "Event title, description, date, and start time are required.")
-                template = 'admin/fragments/create_event_content.html' if is_ajax else 'create_event.html'
-                return render(request, template, context)
+                return JsonResponse({'status': 'error', 'message': messages.get_messages(request)._loaded_messages},
+                                    status=400)
 
-            # Insert into Supabase (Use supabase_admin for insertions)
-            insert_result = supabase_admin.table('events').insert({
+            # --- 2. INSERT RECORD INTO SUPABASE DATABASE ---
+            insert_data = {
+                'admin_id': current_admin_id,  # Link event to the creator's ID (bigint)
                 'title': title,
                 'description': description,
                 'date': date,
                 'location': location,
                 'start_time': start_time,
                 'end_time': end_time,
-                'max_attendees': int(max_attendees) if max_attendees else None,
-            }).execute()
+                # Convert max_attendees to int, or None if empty/invalid
+                'max_attendees': int(max_attendees) if max_attendees and max_attendees.isdigit() else None,
+                'picture_url': None,  # Set to None since picture upload is disabled
+            }
+
+            # Insert into Supabase 'events' table
+            insert_result = supabase_admin.table('events').insert(insert_data).execute()
 
             if not insert_result.data:
-                raise Exception(f"Event creation failed: {getattr(insert_result, 'error', 'Unknown error')}")
+                error_message = getattr(insert_result, 'error', 'Unknown database error')
+                raise Exception(f"Database insertion failed: {error_message}")
 
-            messages.success(request, "Event created successfully!")
-            return redirect('admin_dashboard')
+            # --- SUCCESS RESPONSE (FOR AJAX) ---
+            messages.success(request, f"Event '{title}' created successfully!")
+            return JsonResponse({
+                'status': 'success',
+                'message': f"Event '{title}' scheduled successfully!",
+                'event_data': insert_result.data[0]  # Send back the new event data
+            }, status=201)
 
         except Exception as e:
-            messages.error(request, f"Failed to create event: {e}")
-            template = 'admin/fragments/create_event_content.html' if is_ajax else 'create_event.html'
-            return render(request, template, context)
+            # Catch all exceptions (including database errors) and return JSON error
+            return JsonResponse({'status': 'error', 'message': f"Failed to create event: {e}"}, status=500)
 
-    # --- 2. HANDLE GET REQUEST (Loading the Page/Fragment) ---
+    # --- 3. HANDLE GET REQUEST (Loading the Fragment) ---
     else:
-        # GET request only needs to check for AJAX flag and render the fragment
         if is_ajax:
             return render(request, 'admin/fragments/create_event_content.html', context)
         else:
