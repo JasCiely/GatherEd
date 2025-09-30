@@ -20,6 +20,7 @@ urlpatterns = [
     path('events/attendance/', views.track_attendance, name='track_attendance'),
     path('events/feedback/', views.manage_feedback, name='manage_feedback'),
 
+
     # --- STUDENT MANAGEMENT ROUTES (Custom STUDENT) ---
 
     # Other Student Tools/Features

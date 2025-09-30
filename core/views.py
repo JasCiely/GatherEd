@@ -262,50 +262,79 @@ def manage_events(request):
 
 
 # @login_required  # Keep this commented out for development
+@staff_member_required
+@staff_member_required
 def create_event(request):
-    # REMOVED: user_id = str(request.user.pk) <--- Moved this inside the POST block, and commented it out
-
     is_ajax = request.GET.get('is_ajax') == 'true'
-    context = {}
 
-    # --- 1. HANDLE POST REQUEST (Form Submission) ---
+    context = {
+        'title': '',
+        'description': '',
+        'date': '',
+        'location': '',
+        'start_time': '',
+        'end_time': '',
+        'max_attendees': '',
+    }
+
     if request.method == 'POST':
-        # Safely retrieve user_id ONLY when handling POST logic that requires authentication
-        # user_id = str(request.user.pk) # <--- Keep this commented out until you re-enable @login_required
+        title = request.POST.get('title', '').strip()
+        description = request.POST.get('description', '').strip()
+        date_str = request.POST.get('date', '').strip()
+        location = request.POST.get('location', '').strip()
+        start_time_str = request.POST.get('start_time', '').strip()
+        end_time_str = request.POST.get('end_time', '').strip()
+        max_attendees = request.POST.get('max_attendees', '').strip()
+
+        context.update({
+            'title': title,
+            'description': description,
+            'date': date_str,
+            'location': location,
+            'start_time': start_time_str,
+            'end_time': end_time_str,
+            'max_attendees': max_attendees,
+        })
+
+        if not all([title, description, date_str, start_time_str]):
+            messages.error(request, "Event title, description, date, and start time are required.")
+            template = 'admin/fragments/create_event_content.html' if is_ajax else 'create_event.html'
+            return render(request, template, context)
 
         try:
-            # Check if the user is an admin (uncomment when required)
-            # if not supabase_public.table('admins').select('id').eq('id', user_id).execute().data:
-            #     messages.error(request, "Access denied.")
-            #     return redirect('admin_dashboard')
+            event_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            start_time = datetime.strptime(start_time_str, '%H:%M').time()
+            end_time = datetime.strptime(end_time_str, '%H:%M').time() if end_time_str else None
 
-            title = request.POST.get('title')
-            description = request.POST.get('description')
-            date = request.POST.get('date')
-            location = request.POST.get('location')
-            start_time = request.POST.get('start_time')
-            end_time = request.POST.get('end_time')
-            max_attendees = request.POST.get('max_attendees')
-
-            # Ensure start_time is included in the required fields check
-            if not all([title, description, date, start_time]):
-                messages.error(request, "Event title, description, date, and start time are required.")
+            if end_time and start_time >= end_time:
+                messages.error(request, "End time must be after start time.")
                 template = 'admin/fragments/create_event_content.html' if is_ajax else 'create_event.html'
                 return render(request, template, context)
+        except ValueError:
+            messages.error(request, "Invalid date or time format.")
+            template = 'admin/fragments/create_event_content.html' if is_ajax else 'create_event.html'
+            return render(request, template, context)
 
-            # Insert into Supabase (Use supabase_admin for insertions)
+        try:
+            max_attendees_int = int(max_attendees) if max_attendees else None
+        except ValueError:
+            messages.error(request, "Max attendees must be a number.")
+            template = 'admin/fragments/create_event_content.html' if is_ajax else 'create_event.html'
+            return render(request, template, context)
+
+        try:
             insert_result = supabase_admin.table('events').insert({
                 'title': title,
                 'description': description,
-                'date': date,
+                'date': event_date.isoformat(),
                 'location': location,
-                'start_time': start_time,
-                'end_time': end_time,
-                'max_attendees': int(max_attendees) if max_attendees else None,
+                'start_time': start_time.strftime('%H:%M:%S'),
+                'end_time': end_time.strftime('%H:%M:%S') if end_time else None,
+                'max_attendees': max_attendees_int,
             }).execute()
 
             if not insert_result.data:
-                raise Exception(f"Event creation failed: {getattr(insert_result, 'error', 'Unknown error')}")
+                raise Exception(getattr(insert_result, 'error', 'Unknown error'))
 
             messages.success(request, "Event created successfully!")
             return redirect('admin_dashboard')
@@ -315,9 +344,7 @@ def create_event(request):
             template = 'admin/fragments/create_event_content.html' if is_ajax else 'create_event.html'
             return render(request, template, context)
 
-    # --- 2. HANDLE GET REQUEST (Loading the Page/Fragment) ---
     else:
-        # GET request only needs to check for AJAX flag and render the fragment
         if is_ajax:
             return render(request, 'admin/fragments/create_event_content.html', context)
         else:
