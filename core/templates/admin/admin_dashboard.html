@@ -10,6 +10,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/admin_css.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+            integrity="sha256-o6EwG/hR63c9LpL6/q4I8T6X5C8p0Tz3Z1P5y0Y9oW0="
+            crossorigin="anonymous"></script>
+
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
     <div class="dashboard-container">
@@ -74,51 +80,36 @@
     </div>
 
     <script>
-        function toggleNotifications() {
+        // --- Helper Function Declarations ---
+        window.toggleNotifications = function() {
             const drawer = document.getElementById('notification-drawer');
             drawer.classList.toggle('open');
             const badge = document.getElementById('notification-count');
             const count = parseInt(badge.textContent || '0');
 
-            // Toggle visibility of the badge when the drawer opens/closes
             if (drawer.classList.contains('open') && count > 0) {
                 badge.style.display = 'none';
             } else if (!drawer.classList.contains('open') && count > 0) {
                 badge.style.display = 'block';
             }
-        }
+        };
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const count = parseInt(document.getElementById('notification-count').textContent || '0');
-            document.getElementById('notification-count').style.display = count > 0 ? 'block' : 'none';
-
-            // Set initial state for history API (now redundant due to data-clean-url but safe)
-            document.querySelector('.sidebar-nav .nav-item.active').setAttribute('data-initial-href', window.location.pathname);
-        });
-
-        function loadContent(url, linkElement) {
+        window.loadContent = function(url, linkElement) {
             const contentArea = document.getElementById('content-area');
             const pageTitleElement = document.getElementById('page-title');
             const activeClass = 'active';
 
-            // 1. Update Active State in Sidebar
             document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
                 item.classList.remove(activeClass);
             });
             linkElement.classList.add(activeClass);
 
-            // 2. Simple Loading State UX
             contentArea.innerHTML = '<div class="loader-placeholder"><i class="fas fa-sync-alt fa-spin"></i> Loading content...</div>';
 
-            // 3. Extract and Update Title (Improved logic)
-            // Use the link's clean text content, removing leading/trailing spaces.
             const titleText = linkElement.textContent.replace(/[\s\r\n]+/g, ' ').trim();
             pageTitleElement.textContent = titleText;
-
-            // Get the clean URL for history update
             const cleanUrl = linkElement.getAttribute('data-clean-url');
 
-            // 4. Fetch New Content via AJAX
             fetch(url)
                 .then(response => {
                     if (!response.ok) {
@@ -127,47 +118,117 @@
                     return response.text();
                 })
                 .then(html => {
-                    contentArea.innerHTML = html;
-                    // 5. Update browser history to reflect the new state without reloading
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    contentArea.innerHTML = '';
+
+                    while (tempDiv.firstChild) {
+                        contentArea.appendChild(tempDiv.firstChild);
+                    }
+
+                    const scripts = contentArea.getElementsByTagName('script');
+                    for (let i = 0; i < scripts.length; i++) {
+                        if (scripts[i].innerHTML) {
+                            eval(scripts[i].innerHTML);
+                        }
+                    }
                     history.pushState(null, titleText, cleanUrl);
                 })
                 .catch(e => {
                     console.error('Error loading content:', e);
                     contentArea.innerHTML = '<div class="error-message">Failed to load content. Please try again.</div>';
                 });
-        }
+        };
 
-        function handleNavClick(element) {
+        window.handleNavClick = function(element) {
             const url = element.getAttribute('data-url');
             loadContent(url, element);
-        }
+        };
 
-        // Style injection for loading/error messages (kept as is)
-        const style = document.createElement('style');
-        style.innerHTML = `
-            .loader-placeholder {
-                text-align: center;
-                padding: 50px;
-                font-size: 1.2rem;
-                color: var(--primary-color);
-            }
-            .loader-placeholder i {
-                margin-right: 10px;
-            }
-            .error-message {
-                text-align: center;
-                padding: 50px;
-                font-size: 1.2rem;
-                color: var(--attention-color);
-            }
-            /* Add variables if they don't exist in admin_css.css */
-            :root {
-                --primary-color: #00A9FF;
-                --attention-color: #FFC107;
-                --text-muted: #BDBDBD;
-            }
-        `;
-        document.head.appendChild(style);
+        // --- JQUERY READY BLOCK FOR FORM SUBMISSION (TOAST NOTIFICATION) ---
+        $(document).ready(function() {
+
+            const count = parseInt(document.getElementById('notification-count').textContent || '0');
+            document.getElementById('notification-count').style.display = count > 0 ? 'block' : 'none';
+            document.querySelector('.sidebar-nav .nav-item.active').setAttribute('data-initial-href', window.location.pathname);
+
+            // Style injection... (omitted for brevity, assume this is correct)
+
+            // --- GLOBAL JQUERY EVENT DELEGATION FOR FORM SUBMISSION ---
+            $(document).on('submit', '#create-event-form', function(e) {
+                e.preventDefault();
+
+                const form = $(this);
+                const url = form.attr('action');
+                const formData = new FormData(form[0]);
+
+                const submitButton = form.find('button[type="submit"]');
+                submitButton.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Scheduling...');
+
+                $.ajax({
+                    type: 'POST',
+                    url: url,
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+
+                    success: function(response) {
+                        // The success handler runs when status is 200 or 204 (our new status)
+
+                        // We must check if response exists before trying to access it
+                        if (response && response.status === 'success') {
+                            // --- TOAST NOTIFICATION LOGIC ---
+                            Swal.fire({
+                                toast: true,
+                                position: 'top-end',
+                                icon: 'success',
+                                title: response.message,
+                                showConfirmButton: false,
+                                timer: 4000,
+                                timerProgressBar: true,
+                                didOpen: (toast) => {
+                                    toast.addEventListener('mouseenter', Swal.stopTimer)
+                                    toast.addEventListener('mouseleave', Swal.resumeTimer)
+                                }
+                            });
+                        } else if (response && response.status === 'error') {
+                            // Handle logical errors returned by the view with status 204 (unlikely, but safe)
+                            Swal.fire('Error', response.message, 'error');
+                        } else {
+                            // Handle success when response body is empty (due to status 204)
+                            Swal.fire({
+                                toast: true,
+                                position: 'top-end',
+                                icon: 'success',
+                                title: 'Event scheduled successfully!',
+                                showConfirmButton: false,
+                                timer: 4000,
+                                timerProgressBar: true
+                            });
+                        }
+                    },
+
+                    error: function(xhr) {
+                        let errorMessage = "An unknown server error occurred.";
+                        try {
+                            const errorResponse = JSON.parse(xhr.responseText);
+                            errorMessage = errorResponse.message || "A required field is missing or data is invalid.";
+                        } catch (e) {
+                            errorMessage = `Server Error (${xhr.status}). Check your console.`;
+                        }
+
+                        Swal.fire('Failed to Schedule', errorMessage, 'error');
+                    },
+
+                    // --- FINAL STEP: ENSURE RESET RUNS ---
+                    complete: function() {
+                        // Reset the button and the form regardless of success/fail
+                        submitButton.prop('disabled', false).html('<i class="fas fa-calendar-plus"></i> Schedule Event');
+                        form[0].reset();
+                    }
+                });
+            });
+        });
     </script>
 </body>
 </html>

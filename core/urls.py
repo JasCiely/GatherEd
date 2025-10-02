@@ -28,4 +28,7 @@ urlpatterns = [
     path('feedback/submit/', views.submit_feedback, name='submit_feedback'),
     path('notifications/', views.get_notifications, name='get_notifications'),
     path('events/register/<int:event_id>/', views.event_register, name='event_register'),
+
+    # A Successful Message after Creating an Event
+    path('admin/events/modify/<uuid:event_id>/', views.modify_event, name='modify_event'),
 ]

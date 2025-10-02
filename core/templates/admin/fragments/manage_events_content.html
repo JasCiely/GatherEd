@@ -49,7 +49,12 @@
                     <td data-label="Event Name">{{ event.name }}</td>
                     <td data-label="Date">{{ event.date }}</td>
                     <td data-label="Registrations">{{ event.registrations }}</td>
-                    <td data-label="Status" class="status-{{ event.status|lower }}">{{ event.status }}</td>
+
+                    {# 💡 FIX: Ensure the class uses the lowercase status for CSS styling #}
+                    <td data-label="Status" class="status-{{ event.status|lower }}">
+                        {{ event.status }}
+                    </td>
+
                     <td data-label="Actions" class="action-buttons">
                         <button class="btn-action edit" title="Edit Event"><i class="fas fa-edit"></i></button>
                         <button class="btn-action delete" title="Delete Event"><i class="fas fa-trash"></i></button>

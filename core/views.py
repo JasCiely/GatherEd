@@ -1,7 +1,6 @@
-import os
+# core/views.py
 import uuid
 
-from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.conf import settings
@@ -10,17 +9,9 @@ from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from datetime import date
-from django.core.mail import send_mail  # Kept the import in case it's used elsewhere
-from django.template.loader import render_to_string  # Kept the import in case it's used elsewhere
-from django.utils.html import strip_tags  # Kept the import in case it's used elsewhere
-import random  # Kept the import in case it's used elsewhere
-from datetime import datetime, timedelta  # Kept the import in case it's used elsewhere
-import re
+from datetime import datetime
+from django.urls import reverse
 
-# Initialize Supabase clients for data storage
-supabase_public: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-supabase_admin: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
 
 
 def index(request):
@@ -28,6 +19,24 @@ def index(request):
 
 
 def register(request):
+    # --- 0. CRITICAL FIX: INITIALIZE SUPABASE CLIENTS ---
+    try:
+        # The public client is used for read-only checks (like checking if an ID exists)
+        # Assuming you have SUPABASE_ANON_KEY defined in settings
+        supabase_public: Client = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_ANON_KEY
+        )
+        # The admin client is used for privileged writes (user creation)
+        supabase_admin: Client = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_SERVICE_ROLE_KEY
+        )
+    except AttributeError:
+        # Handle case where keys are not set in settings
+        messages.error(request, "Server configuration error: Supabase keys are missing.")
+        return render(request, 'register.html')
+
     if request.method == 'POST':
         email = request.POST.get('email')
         password = request.POST.get('password')
@@ -36,7 +45,7 @@ def register(request):
         user_type = request.POST.get('user_type')
         cit_id = request.POST.get('cit_id')
 
-        # --- VALIDATION (Unchanged) ---
+        # --- VALIDATION (Simplified & Cleaned) ---
         if not all([email, password, cit_id, name, user_type]):
             messages.error(request, 'All fields are required.')
             return render(request, 'register.html')
@@ -59,9 +68,12 @@ def register(request):
             messages.error(request, 'A user with this email already exists.')
             return render(request, 'register.html')
 
-        student_id_check = supabase_public.table('students').select('cit_id').eq('cit_id',
-                                                                                 formatted_cit_id).execute().data
+        # --- CIT ID EXISTENCE CHECK (Using the correct table names from migration) ---
+        # Note: We must use the table names defined in models.py (admins, students)
+        # Assuming your Supabase tables are named 'admins' and 'students' from the last successful migration.
+        student_id_check = supabase_public.table('students').select('cit_id').eq('cit_id', formatted_cit_id).execute().data
         admin_id_check = supabase_public.table('admins').select('cit_id').eq('cit_id', formatted_cit_id).execute().data
+
         if student_id_check or admin_id_check:
             messages.error(request, 'This ID is already registered.')
             return render(request, 'register.html')
@@ -76,30 +88,36 @@ def register(request):
                 username=email,
                 email=email,
                 password=password,
-                is_staff=is_staff_user  # <--- CRITICAL CHANGE HERE
+                is_staff=is_staff_user
             )
 
             # 2. Create profile in Supabase
             if user_type == 'administrator':
+                # Use the 'admins' table as defined in your models.py
                 admin_result = supabase_admin.table('admins').insert({
-                    'id': str(user.pk),
+                    # Django FK column name is '<ModelName>_id', but your SQL requested 'user_id'
+                    # We use 'user_id' because Django ORM handles the field name mapping.
+                    'user_id': str(user.pk),
                     'name': name,
-                    'cit_id': formatted_cit_id
+                    'cit_id': formatted_cit_id,
+                    'created_at': datetime.now().isoformat()
                 }).execute()
                 if not admin_result.data:
                     user.delete()
-                    raise Exception("Failed to insert admin profile.")
+                    raise Exception("Failed to insert admin profile into admins table.")
                 redirect_path = 'admin_dashboard'
 
             elif user_type == 'student':
+                # Use the 'students' table as defined in your models.py
                 student_result = supabase_admin.table('students').insert({
-                    'id': str(user.pk),
+                    'user_id': str(user.pk),
                     'name': name,
-                    'cit_id': formatted_cit_id
+                    'cit_id': formatted_cit_id,
+                    'created_at': datetime.now().isoformat()
                 }).execute()
                 if not student_result.data:
                     user.delete()
-                    raise Exception("Failed to insert student profile.")
+                    raise Exception("Failed to insert student profile into students table.")
                 redirect_path = 'student_dashboard'
 
             else:
@@ -118,18 +136,30 @@ def register(request):
                 return redirect('login_view')
 
         except Exception as e:
+            # Final cleanup check for the Django User object
+            if 'user' in locals():
+                try:
+                    user.delete()
+                except:
+                    pass
+
             messages.error(request, f'Registration failed: {str(e)}')
             return render(request, 'register.html')
 
     return render(request, 'register.html')
 
 
-# --- REMOVED: def verify_otp(request): ---
-# This function is now removed entirely as it's no longer needed.
-
-
 def login_view(request):
-    # This function remains unchanged as it is a standard login view.
+    # --- 0. CRITICAL FIX: INITIALIZE SUPABASE PUBLIC CLIENT ---
+    try:
+        supabase_public: Client = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_ANON_KEY
+        )
+    except AttributeError:
+        messages.error(request, "Server configuration error: Supabase keys are missing.")
+        return render(request, 'login.html')
+
     if request.method == 'POST':
         email = request.POST.get('email')
         password = request.POST.get('password')
@@ -144,12 +174,14 @@ def login_view(request):
             login(request, user)
 
             try:
-                admin_check = supabase_public.table('admins').select('id').eq('id', str(user.pk)).limit(
+                # Use the 'admins' table name
+                admin_check = supabase_public.table('admins').select('user_id').eq('user_id', str(user.pk)).limit(
                     1).execute().data
                 if admin_check:
                     return redirect('admin_dashboard')
 
-                student_check = supabase_public.table('students').select('id').eq('id', str(user.pk)).limit(
+                # Use the 'students' table name
+                student_check = supabase_public.table('students').select('user_id').eq('user_id', str(user.pk)).limit(
                     1).execute().data
                 if student_check:
                     return redirect('student_dashboard')
@@ -232,67 +264,92 @@ def admin_dashboard(request):
 
 # --- EVENT MANAGEMENT VIEWS (The core features) ---
 
+def get_event_status(event_date_str):
+    """Determines the status of an event based on its date."""
+    try:
+        # Assuming event_date_str is in 'YYYY-MM-DD' format
+        event_date = datetime.datetime.strptime(event_date_str, '%Y-%m-%d').date()
+        today = datetime.date.today()
+
+        if event_date < today:
+            return 'Completed'
+        elif event_date == today:
+            return 'Active'
+        else:
+            return 'Upcoming'
+    except:
+        return 'Unknown'
+
 @login_required
 def manage_events(request):
     """
-    View to display and manage all events, fetching data from Supabase.
+    Admin view to display, manage, and modify all events.
+    Fetches data using the Service Role Key to bypass RLS policies.
     """
-    is_ajax = request.GET.get('is_ajax') == 'true'
-
-    # 🛑 PERMISSION CHECK: Keep commented out until ready 🛑
-    # if not request.user.is_staff:
-    #     if is_ajax:
-    #         return HttpResponse("Permission Denied: Admin role required.", status=403)
-    #     else:
-    #         return redirect('student_dashboard')
-
     events_list = []
 
+    # Check for AJAX request, used by HTMX or custom JS to load content dynamically
+    is_ajax = request.GET.get('is_ajax', False)
+
     try:
+        # CRITICAL FIX: Initialize admin client INSIDE the view
+        # to ensure settings are correctly loaded for the request, fixing the 401 error.
+        admin_client = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_SERVICE_ROLE_KEY
+        )
+
         # Fetch all events, ordered by date
-        fetch_result = supabase_admin.table('events').select('*').order('date', desc=False).execute()
+        # Note: Your shell test confirmed this query structure works.
+        fetch_result = admin_client.table('events').select('*').order('date', desc=False).execute()
 
-        # Helper function to determine status
-        def get_event_status(event_date):
-            today = date.today()
-            event_date = date.fromisoformat(event_date)
+        # Ensure the client object has data before proceeding
+        if not hasattr(fetch_result, 'data'):
+            raise Exception("Supabase response object is malformed.")
 
-            if event_date > today:
-                return 'Upcoming'
-            elif event_date == today:
-                return 'Active'
-            else:
-                return 'Completed'
+        # Check for errors returned by the client object
+        if hasattr(fetch_result, 'error') and fetch_result.error:
+            # Raise an exception to be caught by the outer block
+            raise Exception(f"Supabase Client Error: {fetch_result.error}")
 
-        # Process data and add status/registrations (mocked for now)
+        # Process data and add calculated fields (status, registrations)
         for event in fetch_result.data:
-            # NOTE: Implement real logic to count registrations from event_registrations later
-            mock_registrations = 'N/A'  # Placeholder until registration logic is ready
+            # Mock or calculate registrations (replace 10 with real lookup if available)
+            mock_registrations = 10
 
             events_list.append({
                 'id': event['id'],
+                # Template uses 'name', but Supabase column is 'title'. This mapping is correct.
                 'name': event['title'],
+                'description': event['description'],
                 'date': event['date'],
+                'location': event['location'],
+                'start_time': event['start_time'],
+                'end_time': event['end_time'],
+                'max_attendees': event['max_attendees'],
                 'registrations': mock_registrations,
                 'status': get_event_status(event['date']),
             })
 
     except Exception as e:
-        # Log the error for debugging purposes
+        # This catches the 401 API key error and logs it to the console
         print(f"Error fetching events from Supabase: {e}")
-        # Optionally, send an error message to the user
+        # Add a flash message to alert the administrator
+        messages.error(request,
+                       "Failed to load events due to a critical server error. Check the Django console for details.")
+        # events_list remains empty, which triggers the 'No events found' message in HTML.
 
     template_context = {
         'events_list': events_list,
+        'title': 'Manage Events',
     }
 
-    template_name = 'admin/fragments/manage_events_content.html'
+    # Return the content fragment if it's an AJAX request (for dashboard loading)
+    if is_ajax:
+        return render(request, 'admin/fragments/manage_events_content.html', template_context)
 
-    if not is_ajax:
-        # If it's a full page load, redirect to the dashboard that contains this fragment
-        return redirect('admin_dashboard')
-
-    return render(request, template_name, template_context)
+    # Otherwise, return the full dashboard page
+    return render(request, 'admin/admin_dashboard.html', template_context)
 
 
 @login_required
@@ -303,15 +360,27 @@ def create_event(request):
     is_ajax = request.GET.get('is_ajax') == 'true'
     context = {}
 
-    # --- GET AUTHENTICATED ADMIN ID ---
+    # --- CRITICAL FIX: INITIALIZE SUPABASE ADMIN CLIENT ---
     try:
-        # We grab the admin's numerical ID (bigint) from the logged-in user's primary key (pk)
-        current_admin_id = request.user.pk
-    except Exception:
-        messages.error(request, "Authentication error: Admin ID could not be determined.")
+        supabase_admin: Client = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_SERVICE_ROLE_KEY
+        )
+    except AttributeError:
+        # Avoid using messages in AJAX flow, return JSON error
+        if is_ajax:
+            return JsonResponse({'status': 'error', 'message': 'Server configuration error: Supabase service key is missing.'}, status=500)
         return redirect('admin_dashboard')
 
-        # --- 1. HANDLE POST REQUEST (Form Submission) ---
+    # --- GET AUTHENTICATED ADMIN ID ---
+    try:
+        current_admin_id = request.user.pk
+    except Exception:
+        if is_ajax:
+             return JsonResponse({'status': 'error', 'message': 'Authentication error: Admin ID could not be determined.'}, status=401)
+        return redirect('admin_dashboard')
+
+    # --- 1. HANDLE POST REQUEST (Form Submission) ---
     if request.method == 'POST':
         try:
             # --- FORM FIELD RETRIEVAL ---
@@ -325,41 +394,46 @@ def create_event(request):
 
             # --- FIELD VALIDATION ---
             if not all([title, description, date, start_time]):
-                messages.error(request, "Event title, description, date, and start time are required.")
-                return JsonResponse({'status': 'error', 'message': messages.get_messages(request)._loaded_messages},
-                                    status=400)
+                return JsonResponse({'status': 'error', 'message': "Event title, description, date, and start time are required."}, status=400)
 
             # --- 2. INSERT RECORD INTO SUPABASE DATABASE ---
+            new_uuid = str(uuid.uuid4())  # Generate the UUID once
+
             insert_data = {
-                'admin_id': current_admin_id,  # Link event to the creator's ID (bigint)
+                'id': new_uuid,
+                'admin_id': current_admin_id,
                 'title': title,
                 'description': description,
                 'date': date,
                 'location': location,
                 'start_time': start_time,
                 'end_time': end_time,
-                # Convert max_attendees to int, or None if empty/invalid
                 'max_attendees': int(max_attendees) if max_attendees and max_attendees.isdigit() else None,
-                'picture_url': None,  # Set to None since picture upload is disabled
+                'picture_url': None,
+                'created_at': datetime.now().isoformat(),
             }
 
-            # Insert into Supabase 'events' table
             insert_result = supabase_admin.table('events').insert(insert_data).execute()
 
             if not insert_result.data:
-                error_message = getattr(insert_result, 'error', 'Unknown database error')
+                error_message = getattr(insert_result, 'error', {}).get('message', 'Unknown database error')
                 raise Exception(f"Database insertion failed: {error_message}")
 
             # --- SUCCESS RESPONSE (FOR AJAX) ---
-            messages.success(request, f"Event '{title}' created successfully!")
+
+            modify_url = reverse('modify_event', kwargs={'event_id': new_uuid})
+
+            # **CRITICAL BACKEND FIX:** Return status 204 (No Content)
+            # This ensures the browser does NOT render the JSON body after success.
             return JsonResponse({
                 'status': 'success',
                 'message': f"Event '{title}' scheduled successfully!",
-                'event_data': insert_result.data[0]  # Send back the new event data
-            }, status=201)
+                'event_data': insert_result.data[0],
+                'modify_url': modify_url
+            }, status=204) # <--- THIS IS THE KEY CHANGE
 
         except Exception as e:
-            # Catch all exceptions (including database errors) and return JSON error
+            # Catch all exceptions (including validation and database errors) and return JSON error
             return JsonResponse({'status': 'error', 'message': f"Failed to create event: {e}"}, status=500)
 
     # --- 3. HANDLE GET REQUEST (Loading the Fragment) ---
@@ -368,6 +442,20 @@ def create_event(request):
             return render(request, 'admin/fragments/create_event_content.html', context)
         else:
             return redirect('admin_dashboard')
+
+@login_required
+def modify_event(request, event_id):
+    """
+    Placeholder view for modifying or viewing event details.
+    Takes the event_id (UUID) as a parameter.
+    """
+    context = {
+        'event_id': event_id,
+        'message': f"You are now on the modify page for event ID: {event_id}"
+    }
+    # For now, just render a simple response or template
+    # Replace 'admin/modify_event.html' with your actual template path later.
+    return render(request, 'admin/admin_dashboard.html', context)
 
 
 @login_required
@@ -435,13 +523,18 @@ def manage_feedback(request):
 def event_register(request, event_id):
     user_id = str(request.user.pk)
     try:
-        existing = supabase_public.table('event_registrations').select('*').eq('user_id', user_id).eq('event_id',
+        # Initialize clients here as well, if they are not already available
+        supabase_public: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
+        supabase_admin: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+
+        existing = supabase_public.table('event_registrations').select('*').eq('student_id', user_id).eq('event_id',
                                                                                                       event_id).execute().data
         if existing:
             messages.info(request, "You are already registered.")
         else:
+            # Note: Changed 'user_id' to 'student_id' to match the model/SQL
             insert_result = supabase_admin.table('event_registrations').insert(
-                {'user_id': user_id, 'event_id': event_id}).execute()
+                {'student_id': user_id, 'event_id': event_id}).execute()
             if not insert_result.data:
                 raise Exception(f"Registration insert failed: {getattr(insert_result, 'error', 'Unknown error')}")
             messages.success(request, "Registered successfully!")
@@ -454,6 +547,8 @@ def event_register(request, event_id):
 @login_required
 def event_listing(request):
     try:
+        # Initialize public client
+        supabase_public: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
         events = supabase_public.table('events').select('*').execute().data
         return render(request, 'event_listing.html', {'events': events})
     except Exception as e:

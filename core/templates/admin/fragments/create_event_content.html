@@ -9,8 +9,8 @@
         <p class="card-subtitle">Fill in all fields to schedule a new event.</p>
     </div>
 
-    {# CRITICAL: enctype="multipart/form-data" is required for file uploads #}
-    <form method="POST" action="{% url 'create_event' %}" class="event-form" enctype="multipart/form-data">
+    {# ADDED ID HERE #}
+    <form id="create-event-form" method="POST" action="{% url 'create_event' %}" class="event-form" enctype="multipart/form-data">
         {% csrf_token %}
 
         {# COLUMN 1: Title, Description, Date, and Time #}
