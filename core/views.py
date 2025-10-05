@@ -360,30 +360,32 @@ def create_event(request):
     is_ajax = request.GET.get('is_ajax') == 'true'
     context = {}
 
-    # --- CRITICAL FIX: INITIALIZE SUPABASE ADMIN CLIENT ---
     try:
         supabase_admin: Client = create_client(
             settings.SUPABASE_URL,
             settings.SUPABASE_SERVICE_ROLE_KEY
         )
     except AttributeError:
-        # Avoid using messages in AJAX flow, return JSON error
         if is_ajax:
             return JsonResponse({'status': 'error', 'message': 'Server configuration error: Supabase service key is missing.'}, status=500)
         return redirect('admin_dashboard')
 
-    # --- GET AUTHENTICATED ADMIN ID ---
+    # --- GET AUTHENTICATED ADMIN ID (from admins table, not Django user.pk) ---
     try:
-        current_admin_id = request.user.pk
+        user_pk = str(request.user.pk)
+        admin_record = supabase_admin.table('admins').select('id').eq('user_id', user_pk).limit(1).execute()
+        if not admin_record.data:
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': 'No matching admin profile found for this user.'}, status=400)
+            return redirect('admin_dashboard')
+        admin_id = admin_record.data[0]['id']
     except Exception:
         if is_ajax:
              return JsonResponse({'status': 'error', 'message': 'Authentication error: Admin ID could not be determined.'}, status=401)
         return redirect('admin_dashboard')
 
-    # --- 1. HANDLE POST REQUEST (Form Submission) ---
     if request.method == 'POST':
         try:
-            # --- FORM FIELD RETRIEVAL ---
             title = request.POST.get('title')
             description = request.POST.get('description')
             date = request.POST.get('date')
@@ -392,16 +394,14 @@ def create_event(request):
             end_time = request.POST.get('end_time')
             max_attendees = request.POST.get('max_attendees')
 
-            # --- FIELD VALIDATION ---
             if not all([title, description, date, start_time]):
                 return JsonResponse({'status': 'error', 'message': "Event title, description, date, and start time are required."}, status=400)
 
-            # --- 2. INSERT RECORD INTO SUPABASE DATABASE ---
-            new_uuid = str(uuid.uuid4())  # Generate the UUID once
+            new_uuid = str(uuid.uuid4())
 
             insert_data = {
                 'id': new_uuid,
-                'admin_id': current_admin_id,
+                'admin_id': admin_id,
                 'title': title,
                 'description': description,
                 'date': date,
@@ -419,24 +419,18 @@ def create_event(request):
                 error_message = getattr(insert_result, 'error', {}).get('message', 'Unknown database error')
                 raise Exception(f"Database insertion failed: {error_message}")
 
-            # --- SUCCESS RESPONSE (FOR AJAX) ---
-
             modify_url = reverse('modify_event', kwargs={'event_id': new_uuid})
 
-            # **CRITICAL BACKEND FIX:** Return status 204 (No Content)
-            # This ensures the browser does NOT render the JSON body after success.
             return JsonResponse({
                 'status': 'success',
                 'message': f"Event '{title}' scheduled successfully!",
                 'event_data': insert_result.data[0],
                 'modify_url': modify_url
-            }, status=204) # <--- THIS IS THE KEY CHANGE
+            }, status=204)
 
         except Exception as e:
-            # Catch all exceptions (including validation and database errors) and return JSON error
             return JsonResponse({'status': 'error', 'message': f"Failed to create event: {e}"}, status=500)
 
-    # --- 3. HANDLE GET REQUEST (Loading the Fragment) ---
     else:
         if is_ajax:
             return render(request, 'admin/fragments/create_event_content.html', context)
