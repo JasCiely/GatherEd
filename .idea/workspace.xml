@@ -5,9 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="63f6bda5-e711-4126-95c8-f11a98cd4857" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/GatherEd.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/GatherEd.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/templates/register.html" beforeDir="false" afterPath="$PROJECT_DIR$/core/templates/register.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -25,6 +25,11 @@
     </option>
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="Admin-Dashboard-Copy" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
@@ -33,12 +38,12 @@
     &quot;assignee&quot;: &quot;JasCiely&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/JasCiely/GatherEd.git",
-    "accountId": "f6a0c355-0756-4538-b6c0-ff90b9fb2545"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/JasCiely/GatherEd.git&quot;,
+    &quot;accountId&quot;: &quot;f6a0c355-0756-4538-b6c0-ff90b9fb2545&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 6
 }</component>
@@ -56,7 +61,7 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "Improve-Security-for-Database",
+    "git-widget-placeholder": "Refining-Code",
     "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "C:/Projects/GatherEd",
     "node.js.detected.package.eslint": "true",
