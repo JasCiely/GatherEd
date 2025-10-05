@@ -1,62 +1,86 @@
 from django.db import models
 from django.contrib.auth.models import User
+import uuid # <-- Import the standard Python UUID library
 
-# This will store the profile information for a school administrator.
-# It uses a OneToOneField to link directly to the Django User model.
+# --- PROFILE TABLES (Linked to Django's built-in User) ---
+
 class AdminProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
-    cit_id = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    cit_id = models.CharField(max_length=15, unique=True, db_column='cit_id')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'admins'
 
     def __str__(self):
         return self.name
 
-# This will store the profile information for a student.
-# It uses a OneToOneField to link directly to the Django User model.
+
 class StudentProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
-    cit_id = models.CharField(max_length=15, unique=True, null=True, blank=True)
-
-    def __str__(self):
-        return self.name
-
-# This is the event model, with the school link removed.
-class Event(models.Model):
-    name = models.CharField(max_length=200)
-    description = models.TextField()
-    date = models.DateTimeField()
-
-    def __str__(self):
-        return self.name
-
-# This links students to events they have registered for.
-class EventRegistration(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
-    registration_date = models.DateTimeField(auto_now_add=True)
+    cit_id = models.CharField(max_length=15, unique=True, db_column='cit_id')
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'event')
+        db_table = 'students'
 
     def __str__(self):
-        return f"{self.user.username} registered for {self.event.name}"
+        return self.name
 
-# Announcements are now for the single school.
-class Announcement(models.Model):
+
+# --- EVENT TABLES (Managed) ---
+
+class Event(models.Model):
+    # FIX: Use uuid.uuid4 to generate the default UUID
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+
+    admin = models.ForeignKey(
+        AdminProfile,
+        on_delete=models.CASCADE,
+        db_column='admin_id',
+        related_name='created_events'
+    )
     title = models.CharField(max_length=200)
-    content = models.TextField()
+    description = models.TextField(null=True, blank=True)
+    date = models.DateField()
+    location = models.CharField(max_length=255, null=True, blank=True)
+    start_time = models.TimeField()
+    end_time = models.TimeField(null=True, blank=True)
+    max_attendees = models.IntegerField(null=True, blank=True)
+    picture_url = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'events'
 
     def __str__(self):
         return self.title
 
-# Feedback is also now for the single school.
-class Feedback(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    event = models.ForeignKey(Event, on_delete=models.SET_NULL, null=True, blank=True)
-    content = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
+
+# Maps to the 'event_registrations' SQL table
+class EventRegistration(models.Model):
+    # FIX: Use uuid.uuid4 to generate the default UUID
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.CASCADE,
+        db_column='student_id',
+        related_name='registrations'
+    )
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        db_column='event_id',
+        related_name='registrations'
+    )
+    registration_date = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'event_registrations'
+        unique_together = ('student', 'event')
 
     def __str__(self):
-        return f"Feedback from {self.user.username}"
+        return f"{self.student.name} registered for {self.event.title}"

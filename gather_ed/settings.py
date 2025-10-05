@@ -2,10 +2,14 @@
 Django settings for gather_ed project.
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
+import dj_database_url
+from django.contrib import staticfiles
+from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+load_dotenv()
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
@@ -57,12 +61,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'gather_ed.wsgi.application'
 
-# Database
+# Database configuration using Supabase Session Pooler
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.config(
+        default="sqlite:///db.sqlite3",
+        conn_max_age=600, # persistent connections
+        ssl_require=True # enforce SSL
+    )
 }
 
 # Password validation
@@ -81,6 +86,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
@@ -95,7 +104,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static')
 ]
 
-# This is the destination folder for collectstatic
+# This is the destination folder for collect static
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Media files
@@ -114,7 +123,15 @@ LOGOUT_REDIRECT_URL = 'events:login'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'support@gathered.edu'  # Any dummy for console
 
-# Supabase Credentials
-SUPABASE_URL = 'https://owwnohxtkpinpyikyxuk.supabase.co'
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93d25vaHh0a3BpbnB5aWt5eHVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4MDA1MjYsImV4cCI6MjA3NDM3NjUyNn0.LkghxjiFLPSIAd4zLbCcPG4vI_aWplTPga-V599oRxQ'
-SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93d25vaHh0a3BpbnB5aWt5eHVrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODgwMDUyNiwiZXhwIjoyMDc0Mzc2NTI2fQ.FeRL87bZ6UlTan6oV6HA1cZFbcWs57-7qvY7F41XnO4'
+# Get the URL
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+if not SUPABASE_URL:
+    # Use a method that logs an error or raises an exception if the key is mandatory
+    print("FATAL ERROR: SUPABASE_URL is missing in environment variables.")
+
+# 2. Get the Public/Anon Key (Used for read-only RLS checks)
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY")
+
+# 3. Get the Service Role Key (Used for database writes in Django backend)
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
